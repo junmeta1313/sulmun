@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dreamy Survey Final - Fixed</title>
+    <style>
+        :root {
+            --accent-blue: #4facfe;
+            --accent-purple: #a18cd1;
+            --glass-bg: rgba(255, 255, 255, 0.12);
+            --text-white: #ffffff;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            font-family: 'Pretendard', sans-serif;
+            height: 100vh; overflow: hidden; color: var(--text-white);
+            background: #0f0c29;
+        }
+
+        /* 🌌 몽환적인 보라색 배경 */
+        .bg-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url('https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?auto=format&fit=crop&w=1920&q=80');
+            background-size: cover; background-position: center;
+            z-index: -1; filter: brightness(0.8);
+        }
+
+        .main-wrapper {
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; width: 100vw;
+        }
+
+        .glass-card {
+            width: 90%; max-width: 450px;
+            background: var(--glass-bg); backdrop-filter: blur(20px);
+            border-radius: 25px; padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            text-align: center; position: relative;
+        }
+
+        /* --- Auth UI --- */
+        .auth-tabs { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
+        .tab { font-size: 1rem; font-weight: bold; cursor: pointer; color: rgba(255,255,255,0.4); transition: 0.3s; }
+        .tab.active { color: var(--accent-blue); border-bottom: 2px solid var(--accent-blue); }
+        .auth-form input { width: 100%; box-sizing: border-box; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white; outline: none; }
+        
+        /* --- Survey UI --- */
+        #survey-section { display: none; }
+        .menu-grid { 
+            display: grid; grid-template-columns: 1fr 1fr; gap: 10px; 
+            margin: 15px 0; max-height: 280px; overflow-y: auto; padding-right: 5px;
+        }
+        .menu-item { 
+            background: rgba(255, 255, 255, 0.1); border-radius: 15px; padding: 8px; 
+            cursor: pointer; border: 2px solid transparent; transition: 0.2s;
+        }
+        .menu-item img { width: 100%; height: 80px; object-fit: cover; border-radius: 10px; pointer-events: none; }
+        .menu-item p { margin: 5px 0 0; font-size: 0.85rem; }
+        .menu-item.selected { border-color: var(--accent-blue); background: rgba(79, 172, 254, 0.2); }
+
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 1rem; transition: 0.3s; }
+        .btn-primary { background: var(--accent-blue); color: white; margin-top: 10px; }
+        .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        /* --- 🎬 Full Screen Video --- */
+        #video-container {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #000; z-index: 9999;
+        }
+        video { width: 100%; height: 100%; object-fit: cover; }
+
+        /* --- 팝업 알림 --- */
+        .overlay-popup {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 8000; justify-content: center; align-items: center;
+        }
+        .popup-content { background: #1a1a2e; padding: 30px; border-radius: 20px; border: 1px solid var(--accent-blue); text-align: center; width: 80%; max-width: 300px; }
+        .timer-line { height: 4px; background: var(--accent-blue); margin-top: 15px; width: 100%; animation: shrink 3s linear forwards; }
+        @keyframes shrink { from { width: 100%; } to { width: 0%; } }
+
+        /* 스크롤바 디자인 */
+        .menu-grid::-webkit-scrollbar { width: 4px; }
+        .menu-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="bg-overlay"></div>
+
+    <div class="main-wrapper">
+        <div id="auth-section" class="glass-card">
+            <div class="auth-tabs">
+                <span id="tab-login" class="tab active" onclick="setAuthMode('login')">로그인</span>
+                <span id="tab-signup" class="tab" onclick="setAuthMode('signup')">회원가입</span>
+            </div>
+            <div class="auth-form">
+                <input type="email" id="email" placeholder="이메일">
+                <input type="password" id="password" placeholder="비밀번호(6자 이상)">
+                <button class="btn btn-primary" onclick="handleAuth()">시작하기</button>
+            </div>
+        </div>
+
+        <div id="survey-section" class="glass-card">
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 10px;">
+                <span id="user-info"></span>
+                <div>
+                    <span onclick="resetVoteRecord()" style="cursor:pointer; color:#ffeb3b; margin-right:10px;">[기록리셋]</span>
+                    <span onclick="logout()" style="cursor:pointer;">로그아웃</span>
+                </div>
+            </div>
+            <h3 style="margin: 0;">🍴 저녁 메뉴 투표</h3>
+            <p style="font-size: 0.8rem; opacity: 0.7; margin: 5px 0;">오늘의 추천 메뉴 (최대 3개)</p>
+            
+            <div class="menu-grid" id="menu-list"></div>
+            
+            <button class="btn btn-primary" id="submit-btn-element" onclick="submitVote()">투표 제출하기</button>
+            <div id="voted-msg" style="display:none; padding: 20px; color: var(--accent-purple); font-weight: bold;">
+                이미 참여하셨습니다! ✅
+            </div>
+        </div>
+    </div>
+
+    <div id="video-container">
+        <video id="dance-video" playsinline muted>
+            <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
+        </video>
+    </div>
+
+    <div id="popup" class="overlay-popup">
+        <div class="popup-content">
+            <h2 style="color:var(--accent-blue); margin-top:0;">🎉 완료!</h2>
+            <p>참여 감사드립니다.<br>3초 뒤 축하 영상 시작!</p>
+            <div class="timer-line"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } 
+        from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBQ6nSIQqbNLXuZNiqFBgewi4cGusTykfI",
+            authDomain: "site1-b1f47.firebaseapp.com",
+            projectId: "site1-b1f47",
+            storageBucket: "site1-b1f47.firebasestorage.app",
+            messagingSenderId: "269436929092",
+            appId: "1:269436929092:web:c603f6895c2b6567cde811"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        let currentMode = 'login';
+        let selectedMenus = [];
+        let userId = "";
+
+        const menus = [
+            { id: 1, name: "치킨", img: "chicken" }, { id: 2, name: "초밥", img: "sushi" },
+            { id: 3, name: "피자", img: "pizza" }, { id: 4, name: "파스타", img: "pasta" },
+            { id: 5, name: "스테이크", img: "steak" }, { id: 6, name: "떡볶이", img: "spicy" },
+            { id: 7, name: "햄버거", img: "burger" }, { id: 8, name: "라면", img: "ramen" },
+            { id: 9, name: "비빔밥", img: "rice" }, { id: 10, name: "타코", img: "taco" }
+        ];
+
+        // 1. 상태 감지
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userId = user.uid;
+                document.getElementById('auth-section').style.display = 'none';
+                document.getElementById('survey-section').style.display = 'block';
+                document.getElementById('user-info').innerText = user.email.split('@')[0] + "님";
+                
+                checkVoteStatus();
+            } else {
+                document.getElementById('auth-section').style.display = 'block';
+                document.getElementById('survey-section').style.display = 'none';
+            }
+        });
+
+        // 2. 투표 여부 체크
+        function checkVoteStatus() {
+            const hasVoted = localStorage.getItem('voted_' + userId);
+            const btn = document.getElementById('submit-btn-element');
+            const msg = document.getElementById('voted-msg');
+            const list = document.getElementById('menu-list');
+
+            if (hasVoted) {
+                btn.style.display = 'none';
+                msg.style.display = 'block';
+                list.innerHTML = `<div style="grid-column: 1/3; padding: 40px 0; opacity: 0.5;">투표가 완료된 설문입니다.</div>`;
+            } else {
+                btn.style.display = 'block';
+                msg.style.display = 'none';
+                renderMenus();
+            }
+        }
+
+        // 3. 메뉴 그리기
+        function renderMenus() {
+            const list = document.getElementById('menu-list');
+            list.innerHTML = '';
+            selectedMenus = [];
+            menus.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'menu-item';
+                div.innerHTML = `<img src="https://loremflickr.com/200/150/${m.img},food"><p>${m.name}</p>`;
+                div.onclick = () => {
+                    const idx = selectedMenus.indexOf(m.id);
+                    if (idx > -1) {
+                        selectedMenus.splice(idx, 1);
+                        div.classList.remove('selected');
+                    } else if (selectedMenus.length < 3) {
+                        selectedMenus.push(m.id);
+                        div.classList.add('selected');
+                    } else {
+                        alert("최대 3개까지만 선택 가능합니다!");
+                    }
+                };
+                list.appendChild(div);
+            });
+        }
+
+        // 4. 투표 제출
+        window.submitVote = () => {
+            if (selectedMenus.length === 0) {
+                alert("최소 1개의 메뉴를 선택해주세요.");
+                return;
+            }
+
+            localStorage.setItem('voted_' + userId, 'true');
+            document.getElementById('popup').style.display = 'flex';
+
+            setTimeout(() => {
+                document.getElementById('popup').style.display = 'none';
+                document.getElementById('survey-section').parentElement.style.display = 'none';
+                const videoCont = document.getElementById('video-container');
+                const video = document.getElementById('dance-video');
+                
+                videoCont.style.display = 'block';
+                video.play().catch(() => {
+                    video.muted = true;
+                    video.play();
+                });
+
+                video.onended = () => location.reload();
+            }, 3000);
+        };
+
+        // 5. 기타 기능 (로그인, 리셋 등)
+        window.setAuthMode = (mode) => {
+            currentMode = mode;
+            document.getElementById('tab-login').classList.toggle('active', mode === 'login');
+            document.getElementById('tab-signup').classList.toggle('active', mode === 'signup');
+        };
+
+        window.handleAuth = async () => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            if (password.length < 6) { alert("비밀번호 6자 이상!"); return; }
+            try {
+                if (currentMode === 'signup') {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                    alert("가입 완료!");
+                } else {
+                    await signInWithEmailAndPassword(auth, email, password);
+                }
+            } catch (e) { alert("오류: " + e.message); }
+        };
+
+        window.logout = () => { if(confirm("로그아웃 하시겠습니까?")) signOut(auth); };
+
+        // [중요] 테스트를 위해 투표 기록을 지우는 함수
+        window.resetVoteRecord = () => {
+            localStorage.removeItem('voted_' + userId);
+            alert("투표 기록이 리셋되었습니다. 다시 테스트해보세요!");
+            checkVoteStatus();
+        };
+    </script>
+</body>
+</html>
